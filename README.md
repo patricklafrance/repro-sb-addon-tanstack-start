@@ -18,10 +18,14 @@ TypeError: (0, import_browser_external_node_url.fileURLToPath) is not a function
 
 ## Why
 
-- `src/Hello.stories.tsx` imports `tanstackRouterParameters` from the root barrel `"storybook-addon-tanstack-start"`.
+- `src/Counter.stories.tsx` imports `tanstackRouterParameters` from the root barrel `"storybook-addon-tanstack-start"`.
 - The root entry `dist/index.mjs` begins with `import { tanstackStartPlugin } from "./plugin.mjs";`.
 - `dist/plugin.mjs` executes `const __dirname = path.dirname(fileURLToPath(import.meta.url));` at module load.
 - Vite externalizes `node:url` to a browser shim that does not provide `fileURLToPath`, so that top-level line throws before tree-shaking can matter — it is a side effect, not an unused named export.
+
+## Repro shape
+
+The repro uses a `Counter` component with `createServerFn` (`getCount`, `updateCount`) and a story driven by `tanstackRouterParameters({ loader: { data } })` — the realistic shape. The #8 error fires the instant the browser parses the root-barrel import, before any component or server-fn code executes; the `@tanstack/react-start` usage is present for realism, not as a trigger.
 
 ## Note about issue #7
 
