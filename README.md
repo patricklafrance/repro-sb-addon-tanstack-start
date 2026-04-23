@@ -1,24 +1,33 @@
-# repro-sb-addon-tanstack-start
+# issue-7 repro
 
-Minimal reproductions for two issues in [`storybook-addon-tanstack-start`](https://github.com/jonmumm/storybook-addon-tanstack-start).
-
-Each reproduction lives on its own branch. The `main` branch is empty scaffolding.
-
-- **Branch [`issue-7`](../../tree/issue-7)** — `tanstackStartPlugin` excludes `@tanstack/react-router` from `optimizeDeps`, breaking `use-sync-external-store` in pnpm. Tracks [issue #7](https://github.com/jonmumm/storybook-addon-tanstack-start/issues/7).
-- **Branch [`issue-8`](../../tree/issue-8)** — root barrel pulls Node-only `plugin.mjs` into the browser bundle. Tracks [issue #8](https://github.com/jonmumm/storybook-addon-tanstack-start/issues/8).
+Tracks https://github.com/jonmumm/storybook-addon-tanstack-start/issues/7
 
 ## Reproduce
 
 ```
-git checkout issue-7  # or issue-8
 pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:6006`. Each branch's README describes the expected failure.
+Storybook starts, then the browser console shows:
 
-## Versions
+```
+Uncaught SyntaxError: The requested module
+  '/.../use-sync-external-store@1.6.0/.../shim/with-selector.js'
+  does not provide an export named 'useSyncExternalStoreWithSelector'
+```
 
-- pnpm 10.30.1
-- Node 24+
-- `storybook@10.3.5`, `storybook-addon-tanstack-start@0.2.1`, `vite@8.0.9`
+## Why
+
+- `tanstackStartPlugin` adds `@tanstack/react-router` to `optimizeDeps.exclude` (see `node_modules/storybook-addon-tanstack-start/dist/plugin.mjs`).
+- Vite therefore skips pre-bundling `@tanstack/react-router` and its CJS transitive `use-sync-external-store/shim/with-selector`.
+- Under pnpm's isolated layout, `use-sync-external-store` is not a direct dep of this project, so Vite can't resolve it by bare specifier either — it serves the raw CJS module, which the browser ESM parser rejects on the named import.
+
+## Workaround applied in consumer projects
+
+1. Add `use-sync-external-store` as a direct dependency.
+2. Add `use-sync-external-store/shim/with-selector` to `optimizeDeps.include`.
+
+## Proposed fix (addon-side)
+
+Remove `@tanstack/react-router` from the plugin's `optimizeDeps.exclude`. The plugin only stubs `@tanstack/react-start` / `@tanstack/start-server-core`, not the router.
