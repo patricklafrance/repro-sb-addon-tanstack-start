@@ -23,6 +23,10 @@ Uncaught SyntaxError: The requested module
 - Vite therefore skips pre-bundling `@tanstack/react-router` and its CJS transitive `use-sync-external-store/shim/with-selector`.
 - Under pnpm's isolated layout, `use-sync-external-store` is not a direct dep of this project, so Vite can't resolve it by bare specifier either — it serves the raw CJS module, which the browser ESM parser rejects on the named import.
 
+## Repro shape
+
+The repro uses a `Counter` component with `createServerFn` (`getCount`, `updateCount`) and a story driven by `tanstackRouterParameters({ loader: { data } })` — the realistic shape. The #7 error fires during preview boot, before any component or server-fn code executes; the `@tanstack/react-start` usage is present for realism, not as a trigger.
+
 ## Workaround applied in consumer projects
 
 1. Add `use-sync-external-store` as a direct dependency.
