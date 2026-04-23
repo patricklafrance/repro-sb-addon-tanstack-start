@@ -1,24 +1,36 @@
-# repro-sb-addon-tanstack-start
+# issue-8 repro
 
-Minimal reproductions for two issues in [`storybook-addon-tanstack-start`](https://github.com/jonmumm/storybook-addon-tanstack-start).
-
-Each reproduction lives on its own branch. The `main` branch is empty scaffolding.
-
-- **Branch [`issue-7`](../../tree/issue-7)** — `tanstackStartPlugin` excludes `@tanstack/react-router` from `optimizeDeps`, breaking `use-sync-external-store` in pnpm. Tracks [issue #7](https://github.com/jonmumm/storybook-addon-tanstack-start/issues/7).
-- **Branch [`issue-8`](../../tree/issue-8)** — root barrel pulls Node-only `plugin.mjs` into the browser bundle. Tracks [issue #8](https://github.com/jonmumm/storybook-addon-tanstack-start/issues/8).
+Tracks https://github.com/jonmumm/storybook-addon-tanstack-start/issues/8
 
 ## Reproduce
 
 ```
-git checkout issue-7  # or issue-8
 pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:6006`. Each branch's README describes the expected failure.
+Storybook starts, open a story; the browser console shows:
 
-## Versions
+```
+TypeError: (0, import_browser_external_node_url.fileURLToPath) is not a function
+  at .../sb-vite/deps/storybook-addon-tanstack-start.js
+```
 
-- pnpm 10.30.1
-- Node 24+
-- `storybook@10.3.5`, `storybook-addon-tanstack-start@0.2.1`, `vite@8.0.9`
+## Why
+
+- `src/Hello.stories.tsx` imports `tanstackRouterParameters` from the root barrel `"storybook-addon-tanstack-start"`.
+- The root entry `dist/index.mjs` begins with `import { tanstackStartPlugin } from "./plugin.mjs";`.
+- `dist/plugin.mjs` executes `const __dirname = path.dirname(fileURLToPath(import.meta.url));` at module load.
+- Vite externalizes `node:url` to a browser shim that does not provide `fileURLToPath`, so that top-level line throws before tree-shaking can matter — it is a side effect, not an unused named export.
+
+## Note about issue #7
+
+`vite.config.ts` and `package.json` in this branch include the workaround for issue #7 (`use-sync-external-store` as direct dep + `optimizeDeps.include`). Without it, issue #7's error fires first and masks this one.
+
+## Workaround
+
+Import `tanstackRouterParameters` from `storybook-addon-tanstack-router` directly.
+
+## Proposed fix (addon-side)
+
+Either split the root barrel so browser-side exports don't transitively import `plugin.mjs`, or move the `__dirname` computation inside `tanstackStartPlugin()` so it only runs when the plugin is invoked.
